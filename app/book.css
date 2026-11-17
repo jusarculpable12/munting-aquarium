@@ -70,3 +70,7 @@
 
 /* Long strain lists scroll independently; switching species starts at the top. */
 .book-spread{overflow:hidden}.book-care,.book-collection{min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#a37436 #f6dfa8}.book-care:focus-visible,.book-collection:focus-visible{outline:2px solid #619c99;outline-offset:-3px}.book-traits{display:block;margin:3px 0;color:#416d67!important;font-weight:900}
+
+/* This guide lives inside the Book dialog so it remains above the modal layer. */
+.book-tutorial{position:fixed;inset:0;pointer-events:none;z-index:10}.book-tutorial .tour-card{pointer-events:auto;width:330px;max-height:calc(100dvh - 24px)}.book-tutorial .tour-spotlight{z-index:1}.book-tutorial .tour-card{z-index:2}.book-close-instruction{font-size:.78rem;color:#6d431b}.book-tutorial .tour-actions>div{flex-wrap:wrap}
+@media(orientation:landscape) and (max-height:600px){.book-tutorial .tour-card{width:290px}.book-tutorial .tour-body p{font-size:.68rem;line-height:1.35}.book-tutorial .tour-body h2{font-size:.95rem}.book-close-instruction{font-size:.68rem}}

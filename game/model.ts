@@ -14,7 +14,7 @@ export const unlockPrices = [0, 150, 300];
 export type Fish = { id: string; kind: Species; sex: "F" | "M"; rare: boolean; variant?: string; motherId?: string; born: number; maturesAt?: number; fullness: number; health: number; overfed: number; diedAt?: number; sellAfter?: number };
 export type Tank = { accessories?: PlacedPlant[]; fish: Fish[]; pellets?: { id: string; dropped: number }[]; food: number; water: number; size: number; filter: number; hard: boolean; decor: number; breeding: Partial<Record<Species, number>> };
 export type Order = { id: number; kind: Species; rare: boolean; variant?: string; reward: number };
-export type Save = { discoveries?: string[]; version: 1; coins: number; last: number; tanks: Tank[]; order: Order };
+export type Save = { tutorialComplete?: boolean; discoveries?: string[]; version: 1; coins: number; last: number; tanks: Tank[]; order: Order };
 export const capacity = (tank: Tank) => 6 + 5 * tank.size;
 export const load = (tank: Tank) => tank.fish.reduce((sum, fish) => sum + species[fish.kind].load, 0);
 export const fits = (tank: Tank, kind: Species) => load(tank) + species[kind].load <= capacity(tank) &&
@@ -60,7 +60,7 @@ export function start(now: number): Save {
   const tank = newTank();
   tank.water = 82;
   tank.fish = [fish("guppy", now - GROWTH_MS, "F"), fish("guppy", now - GROWTH_MS, "M")];
-  const save: Save = { version: 1, coins: 85, last: now, tanks: [tank], order: makeOrder(0, tank.fish) };
+  const save: Save = { version: 1, tutorialComplete: false, coins: 85, last: now, tanks: [tank], order: makeOrder(0, tank.fish) };
   rememberDiscoveries(save);
   return save;
 }

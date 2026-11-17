@@ -10,6 +10,7 @@ export function decode(raw: string): Save {
   const integer = (value: number, min: number, max: number) => Number.isInteger(value) && number(value, min, max);
   const timestamp = (value: number) => integer(value, 0, Date.now() + 1000);
   const ids = new Set<string>();
+  if (save?.tutorialComplete !== undefined && typeof save.tutorialComplete !== "boolean") throw new Error("Invalid tutorial progress");
   if (save?.version !== 1 || !number(save.coins, 0, Number.MAX_SAFE_INTEGER) || !timestamp(save.last) ||
       !Array.isArray(save.tanks) || !integer(save.tanks.length, 1, 3) ||
       !save.order || !kinds.includes(save.order.kind) || typeof save.order.rare !== "boolean" ||
