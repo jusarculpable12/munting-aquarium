@@ -14,6 +14,7 @@ import Tutorial from "./Tutorial";
 import BackgroundMusic from "./BackgroundMusic";
 import SoundEffects from "./SoundEffects";
 import QuestBoard from "./QuestBoard";
+import IntroScreen from "./IntroScreen";
 import { feedingSound } from "../game/sound-effects";
 
 function withSaveLock(operation: () => void) {
@@ -27,6 +28,9 @@ const money = (amount: number) => Math.floor(amount).toLocaleString("en-PH");
 export default function Game() {
   const [save, setSave] = useState<Save | null>(null);
   const [ready, setReady] = useState(false);
+  const [introDone, setIntroDone] = useState(false);
+  const introActive = useRef(true);
+  const finishIntro = useCallback(() => { introActive.current = false; setIntroDone(true); }, []);
   const [tutorialOpen, setTutorialOpen] = useState(false);
   const tutorialActive = useRef(false);
   const tutorialStep = useRef(0);
@@ -151,7 +155,7 @@ export default function Game() {
       if (document.hidden) return;
       const existing = latest();
       if (!existing) return;
-      const next = tutorialActive.current ? resume(existing, Date.now()) : advanceVisible(existing, Date.now());
+      const next = (tutorialActive.current || introActive.current) ? resume(existing, Date.now()) : advanceVisible(existing, Date.now());
       if (next !== existing) persist(next);
     }), 1000);
     function update(event: StorageEvent) {
@@ -166,7 +170,7 @@ export default function Game() {
       withSaveLock(() => {
         const existing = latest();
         if (!existing) return;
-        persist(document.hidden && !tutorialActive.current ? advanceVisible(existing, Date.now()) : resume(existing, Date.now()));
+        persist(document.hidden && !tutorialActive.current && !introActive.current ? advanceVisible(existing, Date.now()) : resume(existing, Date.now()));
       });
     }
     document.addEventListener("visibilitychange", visibilityChanged);
@@ -203,7 +207,7 @@ export default function Game() {
 
   function run(action: Action) {
     const execute = () => {
-      if (document.hidden) return;
+      if (document.hidden || introActive.current) return;
       if (tutorialActive.current && action.type === "plant-move" && action.id === "tutorial-sample") {
         setTourPlant(plant => plant ? { ...plant, x: Math.max(.04, Math.min(.93, action.x)), y: Math.max(.82, Math.min(.94, action.y)) } : null);
         if (tourPlant && Math.abs(tourPlant.x - action.x) + Math.abs(tourPlant.y - action.y) > .001) practiceEvent("accessory-moved"); return;
@@ -269,7 +273,7 @@ export default function Game() {
   ]) ?? [];
   const stock = save?.tanks.flatMap((resident, i) => resident.fish.map(fish => ({ fish, tank: i }))) ?? [];
 
-  return <main className="game-page"><div className="game-shell"><section className="rotate-prompt" aria-labelledby="rotate-title"><div className="rotate-card"><span className="rotate-device" aria-hidden="true">↻ ▭</span><h2 id="rotate-title">Turn your device sideways</h2><p>Munting Aquarium plays in landscape.<br/>Rotate your phone or tablet to see the whole tank.</p><button onClick={() => void enterLandscape()}>Play fullscreen</button><small>If the screen stays upright, disable rotation lock on your device and rotate it manually.</small></div></section>
+  return <main className="game-page">{!introDone && <IntroScreen saveReady={ready} onComplete={finishIntro}/>}<div className="game-shell" inert={!introDone}><section className="rotate-prompt" aria-labelledby="rotate-title"><div className="rotate-card"><span className="rotate-device" aria-hidden="true">↻ ▭</span><h2 id="rotate-title">Turn your device sideways</h2><p>Munting Aquarium plays in landscape.<br/>Rotate your phone or tablet to see the whole tank.</p><button onClick={() => void enterLandscape()}>Play fullscreen</button><small>If the screen stays upright, disable rotation lock on your device and rotate it manually.</small></div></section>
       <header className="game-banner">
  <div className="game-logo"><span aria-hidden="true">🐟</span><h1>Munting<br/>Aquarium</h1></div>{save && <div className="tank-plaque">Tank {index + 1}{tank && <small>{load(tank)}/{capacity(tank)} space</small>}</div>}
  {tank && <div className="hud-meters"><Meter label="Water quality" value={tank.water} /><Meter label="Fish happy" value={happiness(tank)} /><Meter label="Fullness" value={fullness(tank)} /></div>}

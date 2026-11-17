@@ -68,10 +68,11 @@ export default function TankScene({tank,onFeed,onEat,highlighted,feedingDisabled
  // Bank into a small arc and kick the fins instead of flattening into a line.
  ctx.save();ctx.translate(x,y+Math.sin(turn*Math.PI/2)*12*bank);
  ctx.rotate(bank*turn*.38*visibleDirection);
- ctx.scale(visibleDirection*(1-turn*.35)*size,(1+turn*.12)*size);
+ ctx.scale(visibleDirection*size,size);
  ctx.transform(1,bank*turn*.12,0,1,0,0);
  ctx.rotate(Math.sin(t*2+i)*.025);
- ctx.scale(artAspect,1);paintFish(ctx,fish,t+i,biteProgress,turn,{fullness:fish.fullness,pregnancy});ctx.restore();
+ const velocity=seconds>0?Math.hypot(x-previous.x,y-previous.y)/seconds:0;
+ ctx.scale(artAspect,1);paintFish(ctx,fish,reduced.matches?0:t+i,biteProgress,turn,{fullness:fish.fullness,pregnancy},Math.min(1,velocity/155));ctx.restore();
  if(turn>.15){
    for(let trail=0;trail<3;trail++){
      ctx.beginPath();ctx.arc(x-visibleDirection*(35+trail*12),y+bank*(8+trail*5),2+trail*.6,0,Math.PI*2);
