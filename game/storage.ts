@@ -17,6 +17,8 @@ export function decode(raw: string): Save {
       !integer(save.order.id, 0, Number.MAX_SAFE_INTEGER - 1) || !integer(save.order.reward, 1, 180)) {
     throw new Error("Invalid aquarium save");
   }
+  if (save.order.age !== undefined && !["baby", "adult"].includes(save.order.age)) throw new Error("Invalid requested age");
+  if (save.order.variant !== undefined && !varieties[save.order.kind].some(color => color.id === save.order.variant)) throw new Error("Invalid requested variant");
   if(save.discoveries!==undefined&&(!Array.isArray(save.discoveries)||save.discoveries.length>discoveryKeys.length||new Set(save.discoveries).size!==save.discoveries.length||save.discoveries.some(entry=>!discoveryKeys.includes(entry))))throw new Error('Invalid fish discoveries');
   for (const tank of save.tanks) {
     if (!tank || !number(tank.food, 0, 100) || !number(tank.water, 0, 100) ||
