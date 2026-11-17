@@ -11,13 +11,17 @@ import TankScene from "./TankScene";
 import FishPortrait from "./FishPortrait";
 import FishBook from "./FishBook";
 import Tutorial from "./Tutorial";
+import BackgroundMusic from "./BackgroundMusic";
+import SoundEffects from "./SoundEffects";
+import QuestBoard from "./QuestBoard";
+import { feedingSound } from "../game/sound-effects";
 
 function withSaveLock(operation: () => void) {
   if (navigator.locks) void navigator.locks.request(key, operation);
   else operation();
 }
 
-const tabs = ["Care", "Collection", "Fish shop", "Tanks", "Settings"] as const;
+const tabs = ["Care", "Collection", "Fish shop", "Quests", "Tanks", "Settings"] as const;
 const money = (amount: number) => Math.floor(amount).toLocaleString("en-PH");
 
 export default function Game() {
@@ -221,6 +225,8 @@ export default function Game() {
       const time = Date.now();
       const [next, result] = act(tutorialActive.current ? resume(existing, time) : advanceVisible(existing, time), action, time);
       persist(next);
+      const sound = feedingSound(action, result);
+      if (sound) document.dispatchEvent(new CustomEvent("aquarium-feeding-sound", { detail: sound }));
       say(result);
       if (action.type === "unlock" && next.tanks.length > existing.tanks.length) select(next.tanks.length - 1);
     };
@@ -306,12 +312,10 @@ export default function Game() {
 {plantCatalog.map(item=><div className="list-row accessory-shop-row" key={item.id}><PlantPortrait kind={item.id}/><div><strong>{item.name}</strong><small>{item.size} · {item.slots} {item.slots===1?'slot':'slots'} · {item.category}</small><small>{item.benefit}</small></div><button disabled={save.coins<item.price||accessoryLoad(tank)+item.slots>accessoryLimit(tank)||(item.category==='Equipment'&&tank.accessories?.some(p=>p.kind===item.id))} onClick={()=>run({type:'plant-buy',tank:index,kind:item.id})}>Buy · {item.price} coins</button></div>)}
 {!!tank.accessories?.length&&<><h3>In Tank {index+1}</h3>{tank.accessories.map(plant=><div className="line" key={plant.id}><span>{plantDefinition(plant.kind).name}</span><label className="depth-setting">Layer <select aria-label={plantDefinition(plant.kind).name+' depth'} value={plant.layer??'front'} onChange={e=>run({type:'plant-layer',tank:index,id:plant.id,layer:e.target.value as 'front'|'back'})}><option value="back">Behind cave</option><option value="front">In front</option></select></label><button onClick={()=>run({type:'plant-return',tank:index,id:plant.id})}>Return · +{accessoryRefund(plant)} coins</button></div>)}<p className="hint">Returning an accessory refunds the coins you originally paid and frees its slots. Older purchases keep their original refund value.</p></>}
 </section> : <>
-            <p className="eyebrow">CUSTOMER REQUEST</p><h2>{order.rare ? "Lavender " : ""}{species[order.kind].name} <span className="reward">+{order.reward}</span></h2>
-            <p className="muted">Choose an adult fish to sell. Newly bought juveniles grow over 30 game minutes before they can be sold.</p>
-            {stock.filter(({ fish }) => fish.kind === order.kind && (!order.rare || fish.rare) && sellable(fish, now)).map(({ fish, tank: home }) => <button className="sell" key={fish.id} onClick={() => run({ type: "sell", tank: home, fish: fish.id, order: order.id })}>Sell {fish.rare ? "lavender " : ""}{species[fish.kind].name.toLowerCase()} · {fish.sex} · Tank {home + 1}</button>)}
             <p className="hint">Each purchase rolls a random color. Game rarity odds: {rarityOdds}. Lavender is a fantasy color.</p><div className="shop-heading"><h3>Buy for Tank {index + 1}</h3><select aria-label="Sex of purchased fish" value={sex} onChange={e => setSex(e.target.value as "F" | "M")}><option value="F">Female</option><option value="M">Male</option></select></div>
             {kinds.map((kind: Species) => <div className="list-row" key={kind}><FishPortrait fish={{ kind, sex, rare: false }} /><div><strong>{species[kind].name}</strong><small>{species[kind].load} space · {species[kind].water}% water{kind === "molly" ? " · Hard water" : ""}</small></div><button onClick={() => run({ type: "buy", kind, sex, tank: index })}>{species[kind].price} coins</button></div>)}
           </>}</>}
+          {tab === "Quests" && <QuestBoard save={save} now={now} onAction={run}/>}
           {tab === "Tanks" && <>
             <p className="eyebrow">TANK WORKSHOP</p><h2>Make room to grow</h2><div className="stocking-summary"><strong>Tank {index + 1}: {load(tank)}/{capacity(tank)} space used</strong><meter min={0} max={capacity(tank)} value={load(tank)} aria-label="Tank capacity used"/><small>{Math.max(0, capacity(tank) - load(tank))} space available · {tank.fish.length} fish</small></div>
             {(["size", "filter"] as const).map(type => <button className="action" key={type} disabled={tank[type] === 2} onClick={() => run({ type, tank: index })}><span><strong>{type === "size" ? "Larger tank" : "Better filtration"}</strong><small>{type === "size" ? `Capacity ${capacity(tank)} → ${capacity(tank) + 5} space` : "Slower waste buildup"} · Level {tank[type] + 1}</small></span><span>{tank[type] === 2 ? "Max" : (type === "size" ? 65 : 45) * (tank[type] + 1) + " coins"}</span></button>)}
@@ -319,12 +323,15 @@ export default function Game() {
 
           </>}          {tab === "Tanks" && <><p className="eyebrow">YOUR AQUARIUMS</p><p className="muted">Choose a tank or unlock more space.</p><div className="tank-select">{unlockPrices.map((price,i) => <button key={i} aria-pressed={i < save.tanks.length && index === i} disabled={i > save.tanks.length} onClick={() => { if(i < save.tanks.length) select(i); else run({type:"unlock",tank:index}); }}>{i < save.tanks.length ? "Tank " + (i+1) : "Unlock tank " + (i+1) + " · " + price + " coins"}</button>)}</div><p className="hint">{load(tank)} / {capacity(tank)} stocking space · +{visitors(tank)} coins/min from visitors</p></>}
           {tab === "Settings" && <><p className="eyebrow">SAVE & PREFERENCES</p><p>{storageError ? "Local saving unavailable. Export a backup." : "Your aquarium saves automatically in this browser."}</p><button data-tour="export" className="action" onClick={exportSave}>Export save</button><label className="import action">Import save<input type="file" accept=".json,application/json" onChange={e=>{void importSave(e.target.files?.[0]);e.target.value="";}}/></label><button className="action" aria-pressed={notifications} onClick={()=>void toggleNotifications()}>Browser alerts {notifications?"on":"off"}</button><button className="action" onClick={()=>{if(document.fullscreenElement)void document.exitFullscreen();else void document.documentElement.requestFullscreen().catch(()=>say("Fullscreen is unavailable in this browser."));}}>Toggle fullscreen</button><p className="hint">Fish care pauses while away · Visitor earnings capped at 1 hour. Fictional game coins. Browser alerts work while the game is open.</p></>}
+          <BackgroundMusic visible={tab === "Settings"} />
+          <SoundEffects visible={tab === "Settings"} />
           </div>
         </aside>
       </div> : <section className="card welcome">{ready ? <><p className="eyebrow">MABUHAY</p><h2>Open your fish shop</h2><p>Start with a pair of guppies and 85 coins.</p><button className="primary" onClick={() => { persist(start(Date.now())); openTutorial(); say("Your shop is open."); }}>Start game</button></> : <p role="status">Loading your aquarium…</p>}</section>}
       {save && <nav className="game-hotbar" aria-label="Game tools">{([
-        ["Collection","🐠","Fish"],["Fish shop","🏪","Shop"],["Care","💧","Water"],["Tanks","🪟","Tanks"]
-      ] as const).map(([value,icon,label])=><button data-tour={value === "Collection" ? "fish" : value === "Fish shop" ? "shop" : value === "Tanks" ? "tanks" : undefined} key={value} aria-pressed={panelOpen && tab===value} onClick={()=>{if(tab===value)setPanelOpen(open=>!open);else{setTab(value);setPanelOpen(true);}}}><span className="tool-icon" style={{backgroundPosition:`${value === "Tanks" ? 100 : value === "Care" ? 50 : value === "Fish shop" ? 25 : 0}% center`}} aria-hidden="true" data-icon={icon}/>{label}</button>)}<button data-tour="book" className="book-tool" aria-haspopup="dialog" aria-expanded={bookOpen} onClick={()=>{setArranging(false);setPanelOpen(false);setBookOpen(true);}}><span className="book-tool-icon" aria-hidden="true">▤</span>Book</button></nav>}
+        ["Collection","🐠","Fish"],["Fish shop","🏪","Shop"],["Care","💧","Water"],["Quests","📜","Quests"],["Tanks","🪟","Tanks"]
+      ] as const).map(([value,icon,label])=><button data-tour={value === "Collection" ? "fish" : value === "Fish shop" ? "shop" : value === "Tanks" ? "tanks" : undefined} key={value} aria-pressed={panelOpen && tab===value} onClick={()=>{if(tab===value)setPanelOpen(open=>!open);else{setTab(value);setPanelOpen(true);}}}>{value === "Quests" ? <span className="quest-tool-icon" aria-hidden="true">!</span> : <span className="tool-icon" style={{backgroundPosition:`${value === "Tanks" ? 100 : value === "Care" ? 50 : value === "Fish shop" ? 25 : 0}% center`}} aria-hidden="true" data-icon={icon}/>}
+{label}</button>)}<button data-tour="book" className="book-tool" aria-haspopup="dialog" aria-expanded={bookOpen} onClick={()=>{setArranging(false);setPanelOpen(false);setBookOpen(true);}}><span className="book-tool-icon" aria-hidden="true">▤</span>Book</button></nav>}
       {save && tutorialOpen && <Tutorial onClose={closeTutorial} onStep={tourStepChanged} suspended={bookOpen} />}
       {save&&<FishBook save={save} open={bookOpen} onClose={()=>setBookOpen(false)} tutorial={tutorialOpen && tourPage === 0} onTutorialComplete={() => { setBookOpen(false); practiceEvent("book-guide-complete"); }}/>}
       <div className="arrange-toolbar" hidden={!arranging}><span>Drag accessories on the gravel · arrow keys also work</span><button onClick={()=>setArranging(false)}>Done arranging</button></div><dialog className="sale-dialog" ref={saleDialog} aria-labelledby="sale-title" onCancel={() => setPendingSale(null)}>

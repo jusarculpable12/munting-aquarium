@@ -1,6 +1,6 @@
 import { rememberDiscoveries } from './discoveries.ts';
 import { accessoryRefund, accessoryEffects, accessoryLimit, accessoryLoad, accessoryVisitorBonus, plantCatalog, type PlantId, type PlacedPlant } from './accessories.ts';
-import { colorVariety, rollVariety } from './varieties.ts';
+import { colorVariety, rollVariety, varieties } from './varieties.ts';
 export const species = {
   guppy: { name: "Guppy", price: 18, load: 1, water: 55, breed: 960, color: "#f9aa69", profile: "flexible", tail: 8, incompatibleWith: [] },
   platy: { name: "Platy", price: 28, load: 2, water: 60, breed: 1260, color: "#f07966", profile: "flexible", tail: 5, incompatibleWith: [] },
@@ -13,7 +13,7 @@ export const decorations = ["None", "Java fern", "River stones"] as const;
 export const unlockPrices = [0, 150, 300];
 export type Fish = { id: string; kind: Species; sex: "F" | "M"; rare: boolean; variant?: string; motherId?: string; born: number; maturesAt?: number; fullness: number; health: number; overfed: number; diedAt?: number; sellAfter?: number };
 export type Tank = { accessories?: PlacedPlant[]; fish: Fish[]; pellets?: { id: string; dropped: number }[]; food: number; water: number; size: number; filter: number; hard: boolean; decor: number; breeding: Partial<Record<Species, number>> };
-export type Order = { id: number; kind: Species; rare: boolean; variant?: string; reward: number };
+export type Order = { id: number; kind: Species; rare: boolean; variant?: string; age?: "baby" | "adult"; reward: number };
 export type Save = { tutorialComplete?: boolean; discoveries?: string[]; version: 1; coins: number; last: number; tanks: Tank[]; order: Order };
 export const capacity = (tank: Tank) => 6 + 5 * tank.size;
 export const load = (tank: Tank) => tank.fish.reduce((sum, fish) => sum + species[fish.kind].load, 0);
@@ -51,10 +51,22 @@ const fish = (kind: Species, born: number, sex: Fish["sex"], rare = false): Fish
   id: globalThis.crypto.randomUUID(), kind, born, maturesAt: born + GROWTH_MS, sex, rare, fullness: 85, health: 100, overfed: 0,
 });
 const newTank = (): Tank => ({ fish: [], food: 85, water: 95, size: 0, filter: 0, hard: false, decor: 0, breeding: {} });
+export function orderVariant(order: Order) {
+  return colorVariety({ kind: order.kind, rare: order.rare, variant: order.variant });
+}
+export function matchesOrder(fish: Fish, order: Order, now: number): boolean {
+  return !fish.diedAt && fish.kind === order.kind && colorVariety(fish).id === orderVariant(order).id && now >= (fish.sellAfter ?? 0) &&
+    (order.age === "baby" ? !!fish.motherId && !adult(fish, now) : adult(fish, now));
+}
+export const customerName = (order: Order) => ["Aling Nena", "Mang Ben", "Ate Liza", "Kuya Jun", "Tita Rosa", "Lolo Bert"][order.id % 6];
 function makeOrder(id: number, stock: Fish[]): Order {
-  const kind = stock.length ? stock[id % stock.length].kind : kinds[id % kinds.length];
-  const rare = id % 5 === 4 && stock.some(f => f.kind === kind && f.rare);
-  return { id, kind, rare, reward: species[kind].price * (rare ? 4 : 2) };
+  const livingStock = stock.filter(fish => !fish.diedAt);
+  const kind = livingStock.length ? livingStock[id % livingStock.length].kind : kinds[id % kinds.length];
+  const sameKind = livingStock.filter(fish => fish.kind === kind);
+  const color = sameKind.length && id % 3 !== 2 ? colorVariety(sameKind[id % sameKind.length]) : varieties[kind][id % varieties[kind].length];
+  const age = id % 2 === 0 ? "adult" : "baby";
+  const bonus = { Common: 1, Uncommon: 1.2, Rare: 1.6, Legendary: 2 }[color.rarity];
+  return { id, kind, variant: color.id, rare: color.id === "lavender", age, reward: Math.min(180, Math.round(species[kind].price * (age === "baby" ? 1.4 : 2) * bonus)) };
 }
 export function start(now: number): Save {
   const tank = newTank();
@@ -129,6 +141,7 @@ export function advance(save: Save, now: number, random = Math.random): Save {
   return next;
 }
 export type Action =
+  | { type: "next-order"; tank: number }
   | { type: "plant-buy"; tank: number; kind: PlantId }
   | { type: "plant-move"; tank: number; id: string; x: number; y: number }
   | { type: "plant-layer"; tank: number; id: string; layer: "back" | "front" }
@@ -255,10 +268,14 @@ export function act(save: Save, action: Action, now: number, random = Math.rando
       tank.breeding[resident.kind] = 0;
       return [next, "Fish moved."];
     }
+    case "next-order": {
+      if (next.order.id >= Number.MAX_SAFE_INTEGER - 1) return fail("The customer board is full.");
+      next.order = makeOrder(next.order.id + 1, next.tanks.flatMap(t => t.fish));
+      return [next, "A new customer is visiting. No fish sold."];
+    }
     case "sell": {
       const resident = tank.fish.find(f => f.id === action.fish);
-      if (!resident || action.order !== next.order.id || resident.kind !== next.order.kind ||
-        (next.order.rare && !resident.rare) || !sellable(resident, now)) return fail("This fish cannot fill the current order.");
+      if (!resident || action.order !== next.order.id || next.order.id >= Number.MAX_SAFE_INTEGER - 1 || !matchesOrder(resident, next.order, now)) return fail("This fish cannot fill the current order.");
       tank.fish = tank.fish.filter(f => f.id !== resident.id);
       tank.breeding[resident.kind] = 0;
       next.coins += next.order.reward;
