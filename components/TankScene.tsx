@@ -94,7 +94,7 @@ export default function TankScene({tank,onFeed,onEat,highlighted,feedingDisabled
  frame=requestAnimationFrame(draw);
  }frame=requestAnimationFrame(draw);return()=>cancelAnimationFrame(frame);
  },[]);
- return <canvas ref={canvas} width={1440} height={900} role="button" tabIndex={feedingDisabled?-1:0} aria-label="Aquarium water. Tap or press Enter to drop one pellet" onPointerDown={e=>{const r=e.currentTarget.getBoundingClientRect();drop((e.clientX-r.left)*960/r.width,(e.clientY-r.top)*600/r.height);}} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();drop(480,130);}}}/>;
+ return <canvas data-tour="feed" ref={canvas} width={1440} height={900} role="button" tabIndex={feedingDisabled?-1:0} aria-label="Aquarium water. Tap or press Enter to drop one pellet" onPointerDown={e=>{const r=e.currentTarget.getBoundingClientRect();drop((e.clientX-r.left)*960/r.width,(e.clientY-r.top)*600/r.height);}} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();drop(480,130);}}}/>;
 }
 
 

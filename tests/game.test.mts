@@ -231,3 +231,14 @@ test("direct fish sales pay the displayed value once without fulfilling an order
  });
 
 
+
+test("new players need the tutorial; completion and legacy saves remain compatible", () => {
+  const initial = start(Date.now());
+  assert.equal(initial.tutorialComplete, false);
+  assert.equal(decode(JSON.stringify(initial)).tutorialComplete, false);
+  initial.tutorialComplete = true;
+  assert.equal(decode(JSON.stringify(initial)).tutorialComplete, true);
+  delete initial.tutorialComplete;
+  assert.equal(decode(JSON.stringify(initial)).tutorialComplete, undefined);
+  assert.throws(() => decode(JSON.stringify({ ...initial, tutorialComplete: "yes" })));
+});
