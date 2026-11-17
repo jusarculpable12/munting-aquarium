@@ -72,26 +72,45 @@ function withFinForm(source:HTMLCanvasElement,color:import('./varieties').ColorV
 }
 
 /** Facing right; mouth stays at x=25 so feeding and movement share an anchor. */
-export function paintFish(ctx: CanvasRenderingContext2D, fish: Appearance, time = 0, bite = 0, turn = 0, body: FishBodyState = {}) {
+export function paintFish(ctx: CanvasRenderingContext2D, fish: Appearance, time = 0, bite = 0, turn = 0, body: FishBodyState = {}, activity = 0) {
   if (!loading) void loadFishArt();
   const image = sprite(fish); if (!image) return;
   const width = fish.kind === 'swordtail' && fish.sex === 'M' ? 100 : 78;
   const height = width * image.height / image.width;
   ctx.save(); ctx.imageSmoothingEnabled = false;
-  // Narrow vertical strips flex the tail without flipping or resetting the swimmer.
+  // A travelling bend grows from a stable head to the tail. Each section follows
+  // the spine tangent; fin edges flutter separately instead of stretching the body.
   const belly = bellyShape(body.fullness ?? 0, fish.sex === "F" ? body.pregnancy ?? 0 : 0);
   const strips = 48;
+  const effort = Math.max(0, Math.min(1, activity));
+  const phase = time * (fish.kind === 'guppy' ? 9 : fish.kind === 'swordtail' ? 8 : 7);
+  const amplitude = time === 0 ? 0 : (1.5 + effort * 2.6 + turn * 2);
+  const spine = (x: number) => Math.sin(phase + x * 6.5) * Math.pow(1 - x, 2.4) * amplitude;
   for (let i = 0; i < strips; i++) {
     const fraction = i / strips;
-    const tail = Math.pow(1 - fraction, 2);
-    const wave = Math.sin(time * 12 - fraction * 5) * tail * (2 + turn * 4);
+    const wave = spine(fraction);
+    const slope = (spine(Math.min(1, fraction + .01)) - spine(Math.max(0, fraction - .01))) / (.02 * width);
     const mealCurve = Math.exp(-Math.pow((fraction - .70) / .15, 2));
     const gravidCurve = Math.exp(-Math.pow((fraction - .59) / .19, 4));
     const expansion = height * (belly.meal * mealCurve + belly.pregnancy * gravidCurve);
     const sourceX = i * image.width / strips, destX = 25 - width + i * width / strips;
-    const split = image.height * .52;
-    ctx.drawImage(image, sourceX, 0, image.width / strips + .2, split, destX, -height / 2 + wave, width / strips + .15, height * .52);
-    ctx.drawImage(image, sourceX, split, image.width / strips + .2, image.height - split, destX, height * .02 + wave, width / strips + .15, height * .48 + expansion);
+    ctx.save();
+    ctx.translate(destX, wave);
+    ctx.transform(1, slope, 0, 1, 0, 0);
+    // Tail fans sweep edge-on and open again; torso proportions stay unchanged.
+    const fan = Math.max(0, 1 - fraction / .4);
+    const tailFold = 1 - fan * .26 * (1 - Math.cos(phase + fraction * 4));
+    const finBeat = time === 0 ? 0 : Math.sin(phase * 1.7 - fraction * 8) * .09;
+    const rows = [0, .28, .52, .76, 1];
+    for (let row = 0; row < rows.length - 1; row++) {
+      const top = rows[row], bottom = rows[row + 1];
+      const fin = row === 0 || row === 3;
+      const flutter = fin ? finBeat * Math.sin(fraction * Math.PI) * height : 0;
+      const y = (top - .5) * height * tailFold + (row === 0 ? -flutter : 0) + (top >= .52 ? expansion * (top - .52) / .48 : 0);
+      const h = (bottom - top) * height * tailFold + (fin ? flutter : 0) + (top >= .52 ? expansion * (bottom - top) / .48 : 0);
+      ctx.drawImage(image, sourceX, top * image.height, image.width / strips + .2, (bottom - top) * image.height, 0, y, width / strips + .25, h + .15);
+    }
+    ctx.restore();
   }
   if (belly.pregnancy > .08) {
     ctx.save();ctx.globalAlpha = .25 + belly.pregnancy * .35;ctx.fillStyle = '#34312e';
